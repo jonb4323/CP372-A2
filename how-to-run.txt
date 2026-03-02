@@ -1,0 +1,15 @@
+Build the Code:
+& "C:\Users\bjon6\Downloads\JDK\jdk-17.0.17+10\bin\javac.exe" Sender\*.java
+& "C:\Users\bjon6\Downloads\JDK\jdk-17.0.17+10\bin\javac.exe" Receiver\*.java
+
+Run the Receiver:
+cd Receiver
+& "C:\Users\bjon6\Downloads\JDK\jdk-17.0.17+10\bin\java.exe" Receiver localhost 9001 9000 output.txt 0
+
+Run the Sender:
+cd Sender
+& "C:\Users\bjon6\Downloads\JDK\jdk-17.0.17+10\bin\java.exe" Sender localhost 9000 9001 test.txt 1000
+
+Go-Back-N:
+cd Sender
+& "C:\Users\bjon6\Downloads\JDK\jdk-17.0.17+10\bin\java.exe" Sender localhost 9000 9001 test.txt 1000 4
