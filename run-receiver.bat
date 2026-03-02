@@ -1,7 +1,12 @@
 @echo off
 REM Compile and run the Receiver
-cd Receiver
-javac *.java
+
+REM Create bin directory if it doesn't exist
+if not exist "bin\Receiver" mkdir "bin\Receiver"
+
+REM Compile to bin directory
+echo Compiling Receiver...
+javac -d bin\Receiver Receiver\*.java
 if %errorlevel% neq 0 (
     echo Compilation failed!
     pause
@@ -16,5 +21,5 @@ set OUTPUT_FILE=output.txt
 set RN=3
 
 echo Running Receiver...
-java Receiver %SENDER_IP% %SENDER_ACK_PORT% %RCV_DATA_PORT% %OUTPUT_FILE% %RN%
+java -cp bin\Receiver Receiver %SENDER_IP% %SENDER_ACK_PORT% %RCV_DATA_PORT% %OUTPUT_FILE% %RN%
 pause

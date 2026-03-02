@@ -1,7 +1,12 @@
 @echo off
 REM Compile and run the Sender
-cd Sender
-javac *.java
+
+REM Create bin directory if it doesn't exist
+if not exist "bin\Sender" mkdir "bin\Sender"
+
+REM Compile to bin directory
+echo Compiling Sender...
+javac -d bin\Sender Sender\*.java
 if %errorlevel% neq 0 (
     echo Compilation failed!
     pause
@@ -17,5 +22,5 @@ set TIMEOUT_MS=500
 set WINDOW_SIZE=4
 
 echo Running Sender...
-java Sender %RCV_IP% %RCV_DATA_PORT% %SENDER_ACK_PORT% %INPUT_FILE% %TIMEOUT_MS% %WINDOW_SIZE%
+java -cp bin\Sender Sender %RCV_IP% %RCV_DATA_PORT% %SENDER_ACK_PORT% %INPUT_FILE% %TIMEOUT_MS% %WINDOW_SIZE%
 pause
