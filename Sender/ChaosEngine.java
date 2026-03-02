@@ -66,8 +66,8 @@ public class ChaosEngine {
         // RN <= 0 means no ACKs are lost
         if (rn <= 0) {
             return false;
+            
         }
-
         // Drop every rn-th ACK
         return (ackCount % rn == 0);
     }
