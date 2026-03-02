@@ -5,6 +5,7 @@ import java.util.*;
 public class Receiver {
 
     private DatagramSocket dataSocket;
+    private DatagramSocket ackSocket;
     private InetAddress senderIP;
     private int senderAckPort;
     private int expectedSeq;
@@ -24,6 +25,9 @@ public class Receiver {
     private void sendACK(int seqNum) throws IOException {
     }
 
+    private boolean shouldDropACK() {
+    }
+
     private void performHandshake() throws IOException {
     }
 
@@ -39,7 +43,16 @@ public class Receiver {
     private int getCumulativeACK() {
     }
 
+    private void receiveStopAndWait() throws IOException {
+    }
+
+    private void receiveGBN() throws IOException {
+    }
+
     private void receiveFile() throws IOException {
+    }
+
+    private void handleEOT(DSPacket packet) throws IOException {
     }
 
     private void close() throws IOException {
