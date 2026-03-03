@@ -1,3 +1,5 @@
+
+// imports
 import java.io.*;
 import java.net.*;
 import java.util.*;
@@ -17,8 +19,7 @@ public class Receiver {
     private boolean[] received;
     private FileOutputStream fileOutput;
 
-    // initializes receiver with sender address, ports, output file, and drop
-    // interval
+    // creates receiver with sender address, ports, output file, and drop
     public Receiver(String senderIP, int senderAckPort, int rcvDataPort, String outputFile, int rn) throws Exception {
         this.senderIP = InetAddress.getByName(senderIP);
         this.senderAckPort = senderAckPort;
@@ -34,7 +35,7 @@ public class Receiver {
         this.received = new boolean[128];
     }
 
-    // waits for and receives a single UDP packet from the sender
+    // waiting for the receiver to receive a single UDP packet from the sender
     private DSPacket receivePacket() throws IOException {
         byte[] buf = new byte[DSPacket.MAX_PACKET_SIZE];
         DatagramPacket dp = new DatagramPacket(buf, buf.length);
@@ -42,29 +43,29 @@ public class Receiver {
         return new DSPacket(buf);
     }
 
-    // sends an ACK packet back to the sender, may be dropped by ChaosEngine
+    // sending an Acknowledgement packet back to the sender that could be dropped
     private void sendACK(int seqNum) throws IOException {
         ackCount++;
 
         if (ChaosEngine.shouldDrop(ackCount, rn)) {
-            System.out.println("[RECEIVER] ChaosEngine dropped ACK " + seqNum + " (ackCount=" + ackCount + ")");
+            System.out.println("[REC] Dropped ACK " + seqNum + " (ACK Count = " + ackCount + ")");
             return;
         }
-
         DSPacket ackPkt = new DSPacket(DSPacket.TYPE_ACK, seqNum, null);
         byte[] data = ackPkt.toBytes();
         DatagramPacket dp = new DatagramPacket(data, data.length, senderIP, senderAckPort);
         dataSocket.send(dp);
-        System.out.println("[RECEIVER] Sent ACK " + seqNum);
+        System.out.println("[REC] Sent ACK " + seqNum);
     }
 
-    // waits for SOT packet from sender and replies with ACK to establish connection
+    // waiting for start of transfer packet from sender and then replying with
+    // Acknowledgement to establish a connection
     private void performHandshake() throws IOException {
-        System.out.println("[RECEIVER] Waiting for SOT...");
+        System.out.println("[REC] Waiting for SOT");
         while (true) {
             DSPacket pkt = receivePacket();
             if (pkt.getType() == DSPacket.TYPE_SOT) {
-                System.out.println("[RECEIVER] Received SOT, sending ACK 0");
+                System.out.println("[REC] Received SOT, sending ACK 0");
                 sendACK(0);
                 this.expectedSeq = 1;
                 break;
@@ -72,68 +73,63 @@ public class Receiver {
         }
     }
 
-    // processes a received DATA packet — delivers in-order, buffers out-of-order,
-    // discards duplicates
+    // processes a received DATA packet then delivers it in order, buffers out of
+    // order, and discards duplicates
     private void handleDataPacket(DSPacket pkt) throws IOException {
         int seq = pkt.getSeqNum();
         int dist = (seq - expectedSeq + 128) % 128;
 
         if (dist == 0) {
-            System.out.println("[RECEIVER] Received in-order DATA Seq=" + seq);
+            System.out.println("[REC] Received in order DATA Seq = " + seq);
             fileOutput.write(pkt.getPayload());
             expectedSeq = (expectedSeq + 1) % 128;
 
             while (received[expectedSeq]) {
-                System.out.println("[RECEIVER] Delivering buffered DATA Seq=" + expectedSeq);
+                System.out.println("[REC] Delivering buffered DATA Seq =" + expectedSeq);
                 fileOutput.write(buffer[expectedSeq].getPayload());
                 received[expectedSeq] = false;
                 expectedSeq = (expectedSeq + 1) % 128;
             }
-
             int ackSeq = (expectedSeq - 1 + 128) % 128;
             sendACK(ackSeq);
 
         } else if (dist < 100) {
-            System.out.println("[RECEIVER] Received out-of-order DATA Seq=" + seq + " (Buffered)");
+            System.out.println("[REC] Received out of order DATA Seq = " + seq + " (Buffered in Queue)");
             if (!received[seq]) {
                 buffer[seq] = pkt;
                 received[seq] = true;
             }
-
             int ackSeq = (expectedSeq - 1 + 128) % 128;
             sendACK(ackSeq);
-
         } else {
-            System.out.println("[RECEIVER] Received duplicate DATA Seq=" + seq + " (Discarded)");
+            System.out.println("[REC] Received duplicate DATA Seq = " + seq + " (Discarded)");
             int ackSeq = (expectedSeq - 1 + 128) % 128;
             sendACK(ackSeq);
         }
     }
 
-    // main receive loop — handles incoming packets until EOT is received
+    // receiver loop that handles incoming packets until EOT is received
     private void receiveFile() throws IOException {
         while (true) {
             DSPacket pkt = receivePacket();
 
             if (pkt.getType() == DSPacket.TYPE_SOT) {
-                System.out.println("[RECEIVER] Received duplicate SOT, sending ACK 0");
+                System.out.println("[REC] Received duplicate SOT, sending ACK 0");
                 sendACK(0);
                 continue;
             }
-
             if (pkt.getType() == DSPacket.TYPE_EOT) {
-                System.out.println("[RECEIVER] Received EOT (Seq=" + pkt.getSeqNum() + ")");
+                System.out.println("[REC] Received EOT (Seq = " + pkt.getSeqNum() + ")");
                 sendACK(pkt.getSeqNum());
                 return;
             }
-
             if (pkt.getType() == DSPacket.TYPE_DATA) {
                 handleDataPacket(pkt);
             }
         }
     }
 
-    // closes the file output stream and data socket
+    // closes the data socket and file output stream
     private void close() throws IOException {
         if (fileOutput != null) {
             fileOutput.close();
@@ -143,19 +139,18 @@ public class Receiver {
         }
     }
 
-    // entry point — parses arguments and runs the receiver
+    // the entry point that will load arguments and run the receiver
     public static void main(String[] args) throws Exception {
         if (args.length != 5) {
-            System.err.println("Usage: java Receiver <sender_ip> <sender_ack_port> <rcv_data_port> <output_file> <RN>");
+            System.err.println(
+                    "[ERROR] *Must provide 5 arguments: java Receiver <sender_ip> <sender_ack_port> <rcv_data_port> <output_file> <RN>");
             System.exit(1);
         }
-
         String senderIP = args[0];
         int senderAckPort = Integer.parseInt(args[1]);
         int rcvDataPort = Integer.parseInt(args[2]);
         String outputFile = args[3];
         int rn = Integer.parseInt(args[4]);
-
         Receiver receiver = new Receiver(senderIP, senderAckPort, rcvDataPort, outputFile, rn);
 
         try {

@@ -1,3 +1,5 @@
+
+// imports
 import java.io.*;
 import java.net.*;
 import java.util.*;
@@ -17,20 +19,20 @@ public class Sender {
     private long startTime;
     private boolean isGBN;
 
-    // initializes sender with receiver address, ports, timeout, and window size
+    // creating sender with receiver (static) address, ports, timeout, and window
+    // size
     public Sender(String rcvIP, int rcvDataPort, int senderAckPort, int timeoutMs, int windowSize) throws Exception {
         this.receiverIP = InetAddress.getByName(rcvIP);
         this.receiverPort = rcvDataPort;
         this.timeout = timeoutMs;
         this.windowSize = windowSize;
         this.isGBN = (windowSize > 0);
-
         this.dataSocket = new DatagramSocket();
         this.ackSocket = new DatagramSocket(senderAckPort);
         this.ackSocket.setSoTimeout(timeoutMs);
     }
 
-    // reads the input file and splits it into a list of DATA packets
+    // reading the input file and then splitting it into a list of DATA packets
     private List<DSPacket> readFileIntoPackets(String inputFile) throws IOException {
         List<DSPacket> packets = new ArrayList<>();
         File file = new File(inputFile);
@@ -41,45 +43,46 @@ public class Sender {
             while ((bytesRead = fis.read(buffer)) != -1) {
                 byte[] payload = Arrays.copyOf(buffer, bytesRead);
                 packets.add(new DSPacket(DSPacket.TYPE_DATA, seq, payload));
-                seq = (seq + 1) % 128;
+                seq = (seq + 1) % 128; // SN wraps around at 128 (0-127)
             }
         }
         return packets;
     }
 
-    // sends SOT packet and waits for ACK to establish connection with receiver
+    // sending the SOT packet and waiting for ACK to establish connection with
+    // receiver
     private void performHandshake() throws IOException {
         DSPacket sot = new DSPacket(DSPacket.TYPE_SOT, 0, null);
         int attempts = 0;
 
         while (attempts < MAX_TIMEOUTS) {
             sendPacket(sot);
-            System.out.println("[SENDER] SOT sent (Seq=0)");
+            System.out.println("[SND] SOT sent (Seq = 0)");
             try {
                 DSPacket ack = waitForACK();
                 if (ack.getType() == DSPacket.TYPE_ACK && ack.getSeqNum() == 0) {
-                    System.out.println("[SENDER] Handshake complete — ACK 0 received");
+                    System.out.println("[SND] Handshake done, ACK 0 received");
                     return;
                 }
             } catch (SocketTimeoutException e) {
                 attempts++;
-                System.out.println("[SENDER] Timeout waiting for SOT ACK, attempt " + attempts);
+                System.out.println("[SND] Timeout waiting for SOT ACK, attempt " + attempts);
             }
         }
-        System.out.println("Unable to transfer file.");
+        System.out.println("[NOT ABLE TO SEND FILE]");
         close();
         System.exit(1);
     }
 
-    // sends a single packet to the receiver over UDP
+    // sending a single packet to the receiver over UDP
     private void sendPacket(DSPacket packet) throws IOException {
         byte[] data = packet.toBytes();
         DatagramPacket dp = new DatagramPacket(data, data.length, receiverIP, receiverPort);
         dataSocket.send(dp);
     }
 
-    // reorders packets in groups of 4 using ChaosEngine to simulate out-of-order
-    // delivery
+    // reordering packets in groups of 4 using the ChaosEngine to simulate out of
+    // order delivery
     private List<DSPacket> applyPermutation(List<DSPacket> packets) {
         List<DSPacket> result = new ArrayList<>();
         int i = 0;
@@ -96,7 +99,7 @@ public class Sender {
         return result;
     }
 
-    // waits to receive an ACK packet from the receiver
+    // waiting to receive an Acknowledgement packet from the receiver
     private DSPacket waitForACK() throws IOException {
         byte[] buf = new byte[DSPacket.MAX_PACKET_SIZE];
         DatagramPacket dp = new DatagramPacket(buf, buf.length);
@@ -104,7 +107,7 @@ public class Sender {
         return new DSPacket(buf);
     }
 
-    // transfers all packets using Stop-and-Wait protocol (one packet at a time)
+    // transferring all packets using Stop-and-Wait protocol (one packet at a time)
     private void transferStopAndWait() throws IOException {
         if (packetList.isEmpty())
             return;
@@ -116,20 +119,22 @@ public class Sender {
 
             while (!acked) {
                 sendPacket(pkt);
-                System.out.println("[SENDER] S&W Sent DATA Seq=" + pkt.getSeqNum());
+                System.out.println("[SND] Stop-and-Wait Sent DATA Seq = " + pkt.getSeqNum());
 
                 try {
                     DSPacket ack = waitForACK();
                     if (ack.getType() == DSPacket.TYPE_ACK && ack.getSeqNum() == pkt.getSeqNum()) {
-                        System.out.println("[SENDER] S&W ACK received Seq=" + ack.getSeqNum());
+                        System.out.println("[SND] Stop-and-Wait ACK received Seq = " + ack.getSeqNum());
                         acked = true;
                     } else {
                         System.out.println(
-                                "[SENDER] S&W Wrong ACK Seq=" + ack.getSeqNum() + ", expected " + pkt.getSeqNum());
+                                "[SND] Stop-and-Wait Wrong ACK Seq = " + ack.getSeqNum() + ", expected "
+                                        + pkt.getSeqNum());
                     }
                 } catch (SocketTimeoutException e) {
                     timeoutCount++;
-                    System.out.println("[SENDER] S&W Timeout #" + timeoutCount + " for Seq=" + pkt.getSeqNum());
+                    System.out
+                            .println("[SND] Stop-and-Wait Timeout #" + timeoutCount + " for Seq = " + pkt.getSeqNum());
                     if (timeoutCount >= MAX_TIMEOUTS) {
                         System.out.println("Unable to transfer file.");
                         close();
@@ -140,7 +145,7 @@ public class Sender {
         }
     }
 
-    // transfers all packets using Go-Back-N protocol with a sliding window
+    // transferring all packets using Go-Back-N protocol with a sliding window
     private void transferGBN() throws IOException {
         if (packetList.isEmpty())
             return;
@@ -161,7 +166,7 @@ public class Sender {
                 List<DSPacket> ordered = applyPermutation(toSend);
                 for (DSPacket pkt : ordered) {
                     sendPacket(pkt);
-                    System.out.println("[SENDER] GBN Sent DATA Seq=" + pkt.getSeqNum());
+                    System.out.println("[SND] Go-Back-N Sent DATA Seq = " + pkt.getSeqNum());
                 }
             }
 
@@ -169,7 +174,7 @@ public class Sender {
                 DSPacket ack = waitForACK();
                 if (ack.getType() == DSPacket.TYPE_ACK) {
                     int ackSeq = ack.getSeqNum();
-                    System.out.println("[SENDER] GBN ACK received Seq=" + ackSeq);
+                    System.out.println("[SND] Go-Back-N ACK received Seq = " + ackSeq);
 
                     int advancedTo = -1;
                     for (int i = baseIdx; i < nextIdx; i++) {
@@ -182,14 +187,14 @@ public class Sender {
                     if (advancedTo > baseIdx) {
                         baseIdx = advancedTo;
                         timeoutCount = 0;
-                        System.out.println("[SENDER] GBN base advanced, now expecting string index " + baseIdx);
+                        System.out.println("[SND] Go-Back-N base advanced, now expecting string index " + baseIdx);
                     }
                 }
             } catch (SocketTimeoutException e) {
                 timeoutCount++;
-                System.out.println("[SENDER] GBN Timeout #" + timeoutCount);
+                System.out.println("[SND] Go-Back-N Timeout Number: " + timeoutCount);
                 if (timeoutCount >= MAX_TIMEOUTS) {
-                    System.out.println("Unable to transfer file.");
+                    System.out.println("[NOT ABLE TO SEND FILE]");
                     close();
                     System.exit(1);
                 }
@@ -201,19 +206,19 @@ public class Sender {
                 }
 
                 System.out.println(
-                        "[SENDER] GBN Retransmitting window from base seq: " + packetList.get(baseIdx).getSeqNum());
+                        "[SND] Go-Back-N Retransmitting window from base seq: " + packetList.get(baseIdx).getSeqNum());
                 List<DSPacket> ordered = applyPermutation(retransmit);
                 for (DSPacket pkt : ordered) {
                     sendPacket(pkt);
-                    System.out.println("[SENDER] GBN Re-Sent DATA Seq=" + pkt.getSeqNum());
+                    System.out.println("[SND] Go-Back-N Re-Sent DATA Seq = " + pkt.getSeqNum());
                 }
                 nextIdx = limit;
             }
         }
     }
 
-    // sends EOT packet and waits for ACK to end the transfer, then prints total
-    // time
+    // sends End of Transmission packet then waits for acknowledgement to end the
+    // transfer, then prints total time
     private void performTeardown(int eotSeq) throws IOException {
         DSPacket eot = new DSPacket(DSPacket.TYPE_EOT, eotSeq, null);
         int attempts = 0;
@@ -221,16 +226,16 @@ public class Sender {
 
         while (!acked && attempts < MAX_TIMEOUTS) {
             sendPacket(eot);
-            System.out.println("[SENDER] EOT sent (Seq=" + eotSeq + ")");
+            System.out.println("[SND] EOT sent (Seq = " + eotSeq + ")");
             try {
                 DSPacket ack = waitForACK();
                 if (ack.getType() == DSPacket.TYPE_ACK && ack.getSeqNum() == eotSeq) {
                     acked = true;
-                    System.out.println("[SENDER] EOT ACK received — transfer complete");
+                    System.out.println("[SND] EOT ACK received, transfer of file complete");
                 }
             } catch (SocketTimeoutException e) {
                 attempts++;
-                System.out.println("[SENDER] Timeout waiting for EOT ACK, attempt " + attempts);
+                System.out.println("[SND] Timeout waiting for EOT ACK, attempt " + attempts);
             }
         }
 
@@ -239,11 +244,11 @@ public class Sender {
         System.out.printf("Total Transmission Time: %.2f seconds\n", totalSeconds);
 
         if (!acked) {
-            System.out.println("[SENDER] Warning: EOT ACK never received");
+            System.out.println("[SND] ERROR: EOT ACK never received");
         }
     }
 
-    // closes both the data and ACK sockets
+    // closing both the data and acknowledgement sockets
     private void close() {
         if (dataSocket != null && !dataSocket.isClosed())
             dataSocket.close();
@@ -251,12 +256,12 @@ public class Sender {
             ackSocket.close();
     }
 
-    // entry point — parses arguments and runs the sender transfer
+    // the entry point that will load arguments and run the sender transfer
     public static void main(String[] args) throws Exception {
         if (args.length < 5 || args.length > 6) {
             System.err.println(
-                    "Usage: java Sender <rcv_ip> <rcv_data_port> <sender_ack_port> <input_file> <timeout_ms> [window_size]");
-            System.exit(1);
+                    "[ERROR] *Must provide 5 arguments: java Sender <rcv_ip> <rcv_data_port> <sender_ack_port> <input_file> <timeout_ms> [window_size]");
+            System.exit(1); // exit if arguments are incorrect
         }
 
         String rcvIP = args[0];
@@ -267,14 +272,14 @@ public class Sender {
         int windowSize = (args.length == 6) ? Integer.parseInt(args[5]) : -1;
 
         if (windowSize > 0 && (windowSize % 4 != 0 || windowSize > 128)) {
-            System.err.println("Error: window_size must be a multiple of 4 and <= 128");
+            System.err.println("[ERROR] window_size must be a multiple of 4 and <= 128");
             System.exit(1);
         }
 
         Sender sender = new Sender(rcvIP, rcvDataPort, senderAckPort, timeoutMs, windowSize);
         try {
             sender.packetList = sender.readFileIntoPackets(inputFile);
-            System.out.println("[SENDER] File read: " + sender.packetList.size() + " DATA packets");
+            System.out.println("[SND] File read: " + sender.packetList.size() + " DATA packets");
 
             sender.performHandshake();
             sender.startTime = System.currentTimeMillis();
