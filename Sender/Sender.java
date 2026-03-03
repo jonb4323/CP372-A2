@@ -134,7 +134,8 @@ public class Sender {
                 } catch (SocketTimeoutException e) {
                     timeoutCount++;
                     System.out
-                            .println("[SND] Stop-and-Wait Timeout #" + timeoutCount + " for Seq = " + pkt.getSeqNum());
+                            .println("[SND] Stop-and-Wait Timeout Number: " + timeoutCount + " for Seq = "
+                                    + pkt.getSeqNum());
                     if (timeoutCount >= MAX_TIMEOUTS) {
                         System.out.println("Unable to transfer file.");
                         close();
