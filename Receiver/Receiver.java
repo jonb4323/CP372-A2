@@ -17,6 +17,8 @@ public class Receiver {
     private boolean[] received;
     private FileOutputStream fileOutput;
 
+    // initializes receiver with sender address, ports, output file, and drop
+    // interval
     public Receiver(String senderIP, int senderAckPort, int rcvDataPort, String outputFile, int rn) throws Exception {
         this.senderIP = InetAddress.getByName(senderIP);
         this.senderAckPort = senderAckPort;
@@ -32,6 +34,7 @@ public class Receiver {
         this.received = new boolean[128];
     }
 
+    // waits for and receives a single UDP packet from the sender
     private DSPacket receivePacket() throws IOException {
         byte[] buf = new byte[DSPacket.MAX_PACKET_SIZE];
         DatagramPacket dp = new DatagramPacket(buf, buf.length);
@@ -39,6 +42,7 @@ public class Receiver {
         return new DSPacket(buf);
     }
 
+    // sends an ACK packet back to the sender, may be dropped by ChaosEngine
     private void sendACK(int seqNum) throws IOException {
         ackCount++;
 
@@ -54,6 +58,7 @@ public class Receiver {
         System.out.println("[RECEIVER] Sent ACK " + seqNum);
     }
 
+    // waits for SOT packet from sender and replies with ACK to establish connection
     private void performHandshake() throws IOException {
         System.out.println("[RECEIVER] Waiting for SOT...");
         while (true) {
@@ -67,6 +72,8 @@ public class Receiver {
         }
     }
 
+    // processes a received DATA packet — delivers in-order, buffers out-of-order,
+    // discards duplicates
     private void handleDataPacket(DSPacket pkt) throws IOException {
         int seq = pkt.getSeqNum();
         int dist = (seq - expectedSeq + 128) % 128;
@@ -103,6 +110,7 @@ public class Receiver {
         }
     }
 
+    // main receive loop — handles incoming packets until EOT is received
     private void receiveFile() throws IOException {
         while (true) {
             DSPacket pkt = receivePacket();
@@ -125,6 +133,7 @@ public class Receiver {
         }
     }
 
+    // closes the file output stream and data socket
     private void close() throws IOException {
         if (fileOutput != null) {
             fileOutput.close();
@@ -134,6 +143,7 @@ public class Receiver {
         }
     }
 
+    // entry point — parses arguments and runs the receiver
     public static void main(String[] args) throws Exception {
         if (args.length != 5) {
             System.err.println("Usage: java Receiver <sender_ip> <sender_ack_port> <rcv_data_port> <output_file> <RN>");

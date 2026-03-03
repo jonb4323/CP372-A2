@@ -17,6 +17,7 @@ public class Sender {
     private long startTime;
     private boolean isGBN;
 
+    // initializes sender with receiver address, ports, timeout, and window size
     public Sender(String rcvIP, int rcvDataPort, int senderAckPort, int timeoutMs, int windowSize) throws Exception {
         this.receiverIP = InetAddress.getByName(rcvIP);
         this.receiverPort = rcvDataPort;
@@ -29,6 +30,7 @@ public class Sender {
         this.ackSocket.setSoTimeout(timeoutMs);
     }
 
+    // reads the input file and splits it into a list of DATA packets
     private List<DSPacket> readFileIntoPackets(String inputFile) throws IOException {
         List<DSPacket> packets = new ArrayList<>();
         File file = new File(inputFile);
@@ -45,6 +47,7 @@ public class Sender {
         return packets;
     }
 
+    // sends SOT packet and waits for ACK to establish connection with receiver
     private void performHandshake() throws IOException {
         DSPacket sot = new DSPacket(DSPacket.TYPE_SOT, 0, null);
         int attempts = 0;
@@ -68,12 +71,15 @@ public class Sender {
         System.exit(1);
     }
 
+    // sends a single packet to the receiver over UDP
     private void sendPacket(DSPacket packet) throws IOException {
         byte[] data = packet.toBytes();
         DatagramPacket dp = new DatagramPacket(data, data.length, receiverIP, receiverPort);
         dataSocket.send(dp);
     }
 
+    // reorders packets in groups of 4 using ChaosEngine to simulate out-of-order
+    // delivery
     private List<DSPacket> applyPermutation(List<DSPacket> packets) {
         List<DSPacket> result = new ArrayList<>();
         int i = 0;
@@ -90,6 +96,7 @@ public class Sender {
         return result;
     }
 
+    // waits to receive an ACK packet from the receiver
     private DSPacket waitForACK() throws IOException {
         byte[] buf = new byte[DSPacket.MAX_PACKET_SIZE];
         DatagramPacket dp = new DatagramPacket(buf, buf.length);
@@ -97,6 +104,7 @@ public class Sender {
         return new DSPacket(buf);
     }
 
+    // transfers all packets using Stop-and-Wait protocol (one packet at a time)
     private void transferStopAndWait() throws IOException {
         if (packetList.isEmpty())
             return;
@@ -132,6 +140,7 @@ public class Sender {
         }
     }
 
+    // transfers all packets using Go-Back-N protocol with a sliding window
     private void transferGBN() throws IOException {
         if (packetList.isEmpty())
             return;
@@ -203,6 +212,8 @@ public class Sender {
         }
     }
 
+    // sends EOT packet and waits for ACK to end the transfer, then prints total
+    // time
     private void performTeardown(int eotSeq) throws IOException {
         DSPacket eot = new DSPacket(DSPacket.TYPE_EOT, eotSeq, null);
         int attempts = 0;
@@ -232,6 +243,7 @@ public class Sender {
         }
     }
 
+    // closes both the data and ACK sockets
     private void close() {
         if (dataSocket != null && !dataSocket.isClosed())
             dataSocket.close();
@@ -239,6 +251,7 @@ public class Sender {
             ackSocket.close();
     }
 
+    // entry point — parses arguments and runs the sender transfer
     public static void main(String[] args) throws Exception {
         if (args.length < 5 || args.length > 6) {
             System.err.println(
